@@ -135,10 +135,10 @@ enable_ufw() {
     local ssh_port
     ssh_port=$(detect_ssh_port)
     
-    if ! ufw status | grep -qE "^${ssh_port}/tcp\s+ALLOW"; then
-        log_error "SSH port ${ssh_port} not in UFW rules! Aborting to prevent lockout."
-        return 1
-    fi
+#    if ! ufw status | grep -qE "^${ssh_port}/tcp\s+ALLOW"; then
+#        log_error "SSH port ${ssh_port} not in UFW rules! Aborting to prevent lockout."
+#        return 1
+#    fi
     
     # Enable UFW
     ufw --force enable
