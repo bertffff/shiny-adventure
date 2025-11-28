@@ -203,7 +203,7 @@ main_installation() {
     
     # Step 4: Setup SSL Certificates
     SSL_OUTPUT=$(setup_ssl "$PANEL_DOMAIN" "$SSL_EMAIL" "${DATA_DIR}/ssl")
-    eval "$SSL_OUTPUT"
+    eval "$(echo "$SSL_OUTPUT" | grep -E "^(CERT_FILE|KEY_FILE)=")"
     
     # Step 5: Generate Reality Keys
     REALITY_OUTPUT=$(setup_reality_keys)
