@@ -46,25 +46,35 @@ issue_certificate_standalone() {
     local email="$2"
     
     log_info "Issuing SSL certificate for ${domain} (standalone mode)..."
-    
-    # Stop any service on port 80
-    local service_on_80
-    service_on_80=$(ss -tlnp | grep ':80 ' | awk '{print $7}' | grep -oP '(?<=").*(?=")' | head -1)
-    
-    if [[ -n "$service_on_80" ]]; then
-        log_info "Temporarily stopping ${service_on_80} on port 80..."
-        systemctl stop "$service_on_80" 2>/dev/null || true
-        register_rollback "Restart ${service_on_80}" "systemctl start '${service_on_80}'"
+
+    # Check if port 80 is in use
+    local service_on_80=""
+    if ss -tlnp | grep -q ':80 '; then
+        # Extract service name more reliably
+        local port_info
+        port_info=$(ss -tlnp | grep ':80 ' | head -1)
+        # Try to extract process name from the output
+        if echo "$port_info" | grep -q 'users:'; then
+            service_on_80=$(echo "$port_info" | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1)
+        fi
+
+        if [[ -n "$service_on_80" ]]; then
+            log_warn "Port 80 is in use by ${service_on_80}. Attempting to stop temporarily..."
+            systemctl stop "$service_on_80" 2>/dev/null || true
+            register_rollback "Restart ${service_on_80}" "systemctl start '${service_on_80}' 2>/dev/null || true"
+            sleep 2
+        else
+            log_warn "Port 80 is in use, but could not determine service name. Certificate issuance may fail."
+        fi
     fi
-    
-    # Issue certificate
+
+    # Issue certificate (without --force to respect rate limits)
     "${ACME_DIR}/acme.sh" --issue \
         --standalone \
         -d "$domain" \
         --keylength ec-256 \
         --server letsencrypt \
-        --email "$email" \
-        --force
+        --email "$email"
     
     local result=$?
     

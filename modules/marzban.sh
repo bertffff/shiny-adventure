@@ -194,9 +194,9 @@ $(echo -e "$ports_section")
     networks:
       - marzban-network
     ports:
-      - "3000:3000/tcp"
-      - "5353:5353/tcp"
-      - "5353:5353/udp"
+      - "\${ADGUARD_WEB_PORT:-3000}:3000/tcp"
+      - "\${ADGUARD_DNS_PORT:-53}:53/tcp"
+      - "\${ADGUARD_DNS_PORT:-53}:53/udp"
     volumes:
       - ${MARZBAN_DIR}/adguard/work:/opt/adguardhome/work
       - ${MARZBAN_DIR}/adguard/conf:/opt/adguardhome/conf

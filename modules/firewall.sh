@@ -94,10 +94,10 @@ allow_adguard_ports() {
     
     log_info "Allowing AdGuard Home web port: ${web_port}"
     ufw allow "${web_port}/tcp" comment "AdGuard Home Web UI"
-    
-    # DNS port is usually internal only, but allow if specified
-    if [[ -n "$dns_port" && "$dns_port" != "5353" ]]; then
-        log_info "Allowing AdGuard DNS port: ${dns_port}"
+
+    # DNS port: allow if it's the standard DNS port (53) or any custom port
+    if [[ -n "$dns_port" && "$dns_port" == "53" ]]; then
+        log_info "Allowing AdGuard DNS on standard port: ${dns_port}"
         ufw allow "${dns_port}/tcp" comment "AdGuard DNS TCP"
         ufw allow "${dns_port}/udp" comment "AdGuard DNS UDP"
     fi

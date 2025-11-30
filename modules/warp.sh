@@ -314,8 +314,9 @@ setup_warp_via_api() {
         -H "Content-Type: application/json" \
         -H "CF-Client-Version: a-6.11-2223" \
         --data "{\"key\":\"${public_key}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"$(generate_alphanum 16)\"}")
-    
-    if [[ -z "$response" ]] || echo "$response" | jq -e '.result.config' &>/dev/null; then
+
+    # Check if response is valid and contains config
+    if [[ -z "$response" ]] || ! echo "$response" | jq -e '.result.config' &>/dev/null; then
         log_error "WARP API registration failed"
         return 1
     fi
