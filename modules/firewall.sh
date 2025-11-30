@@ -96,7 +96,7 @@ allow_adguard_ports() {
     ufw allow "${web_port}/tcp" comment "AdGuard Home Web UI"
     
     # DNS port is usually internal only, but allow if specified
-    if [[ -n "$dns_port" && "$dns_port" != "5353" ]]; then
+    if [[ -n "$dns_port" && "$dns_port" != "53" ]]; then
         log_info "Allowing AdGuard DNS port: ${dns_port}"
         ufw allow "${dns_port}/tcp" comment "AdGuard DNS TCP"
         ufw allow "${dns_port}/udp" comment "AdGuard DNS UDP"
@@ -158,7 +158,7 @@ print_ufw_status() {
 configure_firewall() {
     local marzban_port="${1:-8443}"
     local adguard_web_port="${2:-3000}"
-    local adguard_dns_port="${3:-5353}"
+    local adguard_dns_port="${3:-53}"
     local vpn_ports=("${@:4}")
     
     log_step "Configuring Firewall (UFW)"
