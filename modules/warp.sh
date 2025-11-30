@@ -308,13 +308,12 @@ setup_warp_via_api() {
         return 1
     fi
     
-    # Call Cloudflare API to register device
+# Call Cloudflare API to register device
     local response
     response=$(curl -sX POST "https://api.cloudflareclient.com/v0a2158/reg" \
         -H "Content-Type: application/json" \
         -H "CF-Client-Version: a-6.11-2223" \
-        --data "{\"key\":\"${public_key}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"$(generate_alphanum 16)\"}")
-    
+        --data "{\"key\":\"${public_key}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"$(cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 16)\"}")    
     if [[ -z "$response" ]] || echo "$response" | jq -e '.result.config' &>/dev/null; then
         log_error "WARP API registration failed"
         return 1
