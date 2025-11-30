@@ -315,8 +315,16 @@ setup_marzban_ssl() {
     create_dir "$marzban_ssl_dir" "0700"
     
     if [[ -f "$cert_file" && -f "$key_file" ]]; then
-        cp "$cert_file" "${marzban_ssl_dir}/${domain}.crt"
-        cp "$key_file" "${marzban_ssl_dir}/${domain}.key"
+	local target_cert="${marzban_ssl_dir}/${domain}.crt"
+        local target_key="${marzban_ssl_dir}/${domain}.key"
+
+        if [[ ! -f "$target_cert" ]] || [[ "$(realpath "$cert_file")" != "$(realpath "$target_cert")" ]]; then
+            cp "$cert_file" "$target_cert"
+        fi
+        
+        if [[ ! -f "$target_key" ]] || [[ "$(realpath "$key_file")" != "$(realpath "$target_key")" ]]; then
+            cp "$key_file" "$target_key"
+        fi
         chmod 0644 "${marzban_ssl_dir}/${domain}.crt"
         chmod 0600 "${marzban_ssl_dir}/${domain}.key"
         
