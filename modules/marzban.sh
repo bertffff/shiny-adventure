@@ -207,11 +207,7 @@ $(echo -e "$ports_section")
 
 networks:
   marzban-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
-          gateway: 172.28.0.1
+    external: true
 EOF
     
     chmod 0644 "$MARZBAN_COMPOSE"
