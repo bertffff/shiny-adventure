@@ -217,7 +217,7 @@ generate_password() {
 # Generate alphanumeric string (for IDs)
 generate_alphanum() {
     local length="${1:-16}"
-    openssl rand -hex "$((length / 2 + 1))" | head -c "$length"
+    openssl rand -hex "$((length / 2 + 1))" | head -c "$length" || true
 }
 
 # Generate short ID for Reality (hex, 8 chars)
