@@ -20,7 +20,7 @@
 #
 # =============================================================================
 
-set -euo pipefail
+set -eu
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
