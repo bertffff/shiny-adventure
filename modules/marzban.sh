@@ -314,25 +314,26 @@ setup_marzban_ssl() {
     local marzban_ssl_dir="${MARZBAN_DIR}/ssl"
     create_dir "$marzban_ssl_dir" "0700"
     
-    if [[ -f "$cert_file" && -f "$key_file" ]]; then
-	local target_cert="${marzban_ssl_dir}/${domain}.crt"
-        local target_key="${marzban_ssl_dir}/${domain}.key"
-
-        if [[ ! -f "$target_cert" ]] || [[ "$(realpath "$cert_file")" != "$(realpath "$target_cert")" ]]; then
-            cp "$cert_file" "$target_cert"
-        fi
-        
-        if [[ ! -f "$target_key" ]] || [[ "$(realpath "$key_file")" != "$(realpath "$target_key")" ]]; then
-            cp "$key_file" "$target_key"
-        fi
-        chmod 0644 "${marzban_ssl_dir}/${domain}.crt"
-        chmod 0600 "${marzban_ssl_dir}/${domain}.key"
-        
-        log_success "SSL certificates copied to Marzban"
-    else
+    if [[ ! -f "$cert_file" || ! -f "$key_file" ]]; then
         log_error "SSL certificate files not found"
         return 1
     fi
+    
+    local target_cert="${marzban_ssl_dir}/${domain}.crt"
+    local target_key="${marzban_ssl_dir}/${domain}.key"
+    
+    # Копируем только если источник и назначение различаются
+    if [[ "$(realpath "$cert_file")" != "$(realpath "$target_cert" 2>/dev/null || echo "")" ]]; then
+        cp "$cert_file" "$target_cert"
+        chmod 0644 "$target_cert"
+    fi
+    
+    if [[ "$(realpath "$key_file")" != "$(realpath "$target_key" 2>/dev/null || echo "")" ]]; then
+        cp "$key_file" "$target_key"
+        chmod 0600 "$target_key"
+    fi
+    
+    log_success "SSL certificates configured for Marzban"
 }
 
 # Start Marzban
@@ -359,15 +360,19 @@ wait_for_marzban() {
     local interval=5
     
     while [[ $elapsed -lt $timeout ]]; do
-        if curl -sf -k "https://127.0.0.1:${panel_port}/api/admin/token" \
+        # Проверяем HTTP код ответа
+        local http_code
+        http_code=$(curl -sk -o /dev/null -w "%{http_code}" \
+            "https://127.0.0.1:${panel_port}/api/admin/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            --data "username=test&password=test" -o /dev/null 2>/dev/null; then
-            # Even 401/422 means API is responding
-            log_success "Marzban API is responding"
+            --data "username=test&password=test" 2>/dev/null)
+        
+        # 401/422 означают что API работает (просто неверные credentials)
+        if [[ "$http_code" == "401" || "$http_code" == "422" || "$http_code" == "200" ]]; then
+            log_success "Marzban API is responding (HTTP ${http_code})"
             return 0
         fi
         
-        # Check if container is running
         if ! docker ps | grep -q marzban; then
             log_error "Marzban container stopped unexpectedly"
             docker logs marzban 2>&1 | tail -30
