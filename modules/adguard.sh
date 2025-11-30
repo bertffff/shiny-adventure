@@ -149,7 +149,6 @@ dns:
   parental_cache_size: 1048576
   cache_time: 30
   rewrites: []
-  blocked_services: []
   upstream_timeout: 10s
   private_networks: []
   use_private_ptr_resolvers: true
