@@ -181,27 +181,6 @@ $(echo -e "$ports_section")
       - ${MARZBAN_DIR}/ssl:/var/lib/marzban/ssl:ro
       - ${MARZBAN_DIR}/templates:/var/lib/marzban/templates:ro
       - ${MARZBAN_DIR}/logs:/var/lib/marzban/logs
-    depends_on:
-      - adguardhome
-    environment:
-      - TZ=\${TZ:-UTC}
-
-  adguardhome:
-    image: adguard/adguardhome:latest
-    container_name: adguardhome
-    restart: unless-stopped
-    hostname: adguardhome
-    networks:
-      - marzban-network
-    ports:
-      - "3000:3000/tcp"
-      - "53:53/tcp"
-      - "53:53/udp"
-    volumes:
-      - ${MARZBAN_DIR}/adguard/work:/opt/adguardhome/work
-      - ${MARZBAN_DIR}/adguard/conf:/opt/adguardhome/conf
-    cap_add:
-      - NET_ADMIN
     environment:
       - TZ=\${TZ:-UTC}
 
