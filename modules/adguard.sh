@@ -345,6 +345,15 @@ setup_adguard() {
     local dns_port="${4:-53}"
     
     log_step "Setting up AdGuard Home"
+
+# [FIX] Check and free port 53
+    if ss -lptn 'sport = :53' | grep -q 'systemd-res'; then
+        log_warn "systemd-resolved is binding port 53. Disabling it to free port for AdGuard..."
+        systemctl disable --now systemd-resolved
+        rm -f /etc/resolv.conf
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        log_success "systemd-resolved disabled, port 53 should be free now."
+    fi
     
     # Generate password if not provided
     if [[ -z "$password" ]]; then
@@ -425,9 +434,9 @@ EOF
     export ADGUARD_USER="$username"
     export ADGUARD_PASS="$password"
     
-    echo "ADGUARD_DNS=${dns_address}"
-    echo "ADGUARD_USER=${username}"
-    echo "ADGUARD_PASS=${password}"
+    echo "ADGUARD_DNS='${dns_address}'"
+    echo "ADGUARD_USER='${username}'"
+    echo "ADGUARD_PASS='${password}'"
 }
 
 # Update AdGuard Home
