@@ -324,17 +324,7 @@ check_adguard_health() {
 # Get AdGuard internal IP for Marzban configuration
 get_adguard_dns_address() {
     local dns_port="${1:-53}"
-    
-    # Get container IP in Docker network
-    local container_ip
-    container_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' adguardhome 2>/dev/null)
-    
-    if [[ -n "$container_ip" ]]; then
-        echo "${container_ip}:${dns_port}"
-    else
-        # Fallback to host.docker.internal or localhost
-        echo "host.docker.internal:${dns_port}"
-    fi
+    echo "adguardhome:${dns_port}"
 }
 
 # Main AdGuard setup function
