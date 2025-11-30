@@ -208,10 +208,10 @@ command_exists() {
     command -v "$1" &>/dev/null
 }
 
-# Generate random password
+# Generate random password (alphanumeric only to avoid shell evaluation issues)
 generate_password() {
     local length="${1:-32}"
-    LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+-=' < /dev/urandom | head -c "$length"
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length"
 }
 
 # Generate alphanumeric string (for IDs)
