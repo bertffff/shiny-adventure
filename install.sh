@@ -131,7 +131,7 @@ pre_installation_checks() {
     log_info "Checking port availability..."
     local ports_to_check=(
         "$MARZBAN_PORT"
-        "$ADGUARD_WEB_PORT"
+    #    "$ADGUARD_WEB_PORT"
         "$PROFILE1_PORT"
         "$PROFILE2_PORT"
         "$PROFILE3_PORT"
