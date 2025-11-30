@@ -232,6 +232,18 @@ main_installation() {
     log_info "Waiting for Marzban to fully initialize..."
     sleep 15
     wait_for_marzban "$MARZBAN_PORT" 180
+
+    if ! check_marzban_health "$MARZBAN_PORT"; then
+        log_error "Marzban health check failed, reviewing logs..."
+        show_marzban_logs 100
+        
+        if confirm_action "Continue despite health check failure?" "n"; then
+            log_warn "Continuing with potential issues..."
+        else
+            execute_rollback
+            exit 1
+        fi
+    fi
     
     # Step 10: Configure VPN Profiles via API
     configure_profiles_via_api \
