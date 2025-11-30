@@ -199,6 +199,27 @@ setup_reality_keys() {
     echo "REALITY_SHORT_IDS=${short_ids}"
 }
 
+# Validate list of SNIs
+validate_sni_list() {
+    local snis=("$@")
+    local valid_snis=()
+    
+    for sni in "${snis[@]}"; do
+        if verify_reality_sni "$sni"; then
+            valid_snis+=("$sni")
+        else
+            log_warn "SNI $sni failed validation, skipping"
+        fi
+    done
+    
+    if [[ ${#valid_snis[@]} -eq 0 ]]; then
+        log_error "No valid SNIs found!"
+        return 1
+    fi
+    
+    echo "${valid_snis[@]}"
+}
+
 # Verify Reality server name (SNI) is accessible
 verify_reality_sni() {
     local sni="$1"
