@@ -48,7 +48,7 @@ create_adguard_config() {
     local username="$1"
     local password="$2"
     local web_port="${3:-3000}"
-    local dns_port="${4:-5353}"
+    local dns_port="${4:-53}"
     
     log_info "Creating AdGuard Home configuration..."
     
@@ -217,7 +217,7 @@ EOF
 # Create Docker Compose file for AdGuard Home
 create_adguard_compose() {
     local web_port="${1:-3000}"
-    local dns_port="${2:-5353}"
+    local dns_port="${2:-53}"
     local compose_file="${ADGUARD_DIR}/docker-compose.yml"
     
     log_info "Creating AdGuard Home Docker Compose file..."
@@ -299,7 +299,7 @@ check_adguard_health() {
     fi
     
     # Check DNS
-    local dns_port="${2:-5353}"
+    local dns_port="${2:-53}"
     if dig @127.0.0.1 -p "$dns_port" google.com +short &>/dev/null; then
         log_success "AdGuard Home DNS is responding"
     else
@@ -311,7 +311,7 @@ check_adguard_health() {
 
 # Get AdGuard internal IP for Marzban configuration
 get_adguard_dns_address() {
-    local dns_port="${1:-5353}"
+    local dns_port="${1:-53}"
     
     # Get container IP in Docker network
     local container_ip
@@ -330,7 +330,7 @@ setup_adguard() {
     local username="${1:-admin}"
     local password="${2:-}"
     local web_port="${3:-3000}"
-    local dns_port="${4:-5353}"
+    local dns_port="${4:-53}"
     
     log_step "Setting up AdGuard Home"
     
