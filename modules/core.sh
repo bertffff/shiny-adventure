@@ -19,7 +19,9 @@ BOLD='\033[1m'
 # -----------------------------------------------------------------------------
 # GLOBAL STATE FOR ROLLBACK
 # -----------------------------------------------------------------------------
-declare -a ROLLBACK_STACK=()
+declare -a CRITICAL_ROLLBACK=()  # Выполняются первыми (UFW, SSH)
+declare -a NORMAL_ROLLBACK=()    # Обычные действия
+declare -a CLEANUP_ROLLBACK=()   # Очистка файлов (последними)
 declare -a CREATED_FILES=()
 declare -a STARTED_SERVICES=()
 declare -a INSTALLED_PACKAGES=()
@@ -57,13 +59,29 @@ log_step() {
 # ROLLBACK SYSTEM (Try/Catch Pattern)
 # -----------------------------------------------------------------------------
 
-# Register a rollback action
-# Usage: register_rollback "description" "command to execute on rollback"
+# Register a rollback action with priority
+# Usage: register_rollback "description" "command" "[critical|normal|cleanup]"
 register_rollback() {
     local description="$1"
     local command="$2"
-    ROLLBACK_STACK+=("${description}|||${command}")
-    log_debug "Registered rollback: ${description}"
+    local priority="${3:-normal}"  # default to normal
+    
+    local entry="${description}|||${command}"
+    
+    case "$priority" in
+        critical)
+            CRITICAL_ROLLBACK+=("$entry")
+            log_debug "Registered CRITICAL rollback: ${description}"
+            ;;
+        cleanup)
+            CLEANUP_ROLLBACK+=("$entry")
+            log_debug "Registered CLEANUP rollback: ${description}"
+            ;;
+        *)
+            NORMAL_ROLLBACK+=("$entry")
+            log_debug "Registered rollback: ${description}"
+            ;;
+    esac
 }
 
 # Register created file for cleanup
@@ -80,14 +98,31 @@ register_service() {
     log_debug "Registered service: ${service}"
 }
 
-# Execute all rollback actions in reverse order
+# Execute all rollback actions by priority
 execute_rollback() {
     log_error "Installation failed! Executing rollback..."
     echo -e "${RED}========================================${NC}"
     echo -e "${RED}       ROLLBACK IN PROGRESS            ${NC}"
     echo -e "${RED}========================================${NC}"
     
-    # Stop registered services
+    # Helper function to process a stack
+    process_rollback_stack() {
+        local -n stack=$1
+        local stack_name=$2
+        local i
+        
+        # Process in reverse order (LIFO) within the priority group
+        for (( i=${#stack[@]}-1; i>=0; i-- )); do
+            if [[ -n "${stack[$i]:-}" ]]; then
+                local description="${stack[$i]%%|||*}"
+                local command="${stack[$i]##*|||}"
+                log_info "[${stack_name}] Rolling back: ${description}"
+                eval "$command" 2>/dev/null || log_warn "Rollback command failed: ${command}"
+            fi
+        done
+    }
+
+    # Stop registered services first
     for service in "${STARTED_SERVICES[@]:-}"; do
         if [[ -n "$service" ]]; then
             log_info "Stopping service: ${service}"
@@ -96,24 +131,31 @@ execute_rollback() {
         fi
     done
     
-    # Stop docker containers if any
+    # Stop docker containers
     if command -v docker &>/dev/null; then
-        log_info "Stopping Marzban containers..."
+        log_info "Stopping Docker containers..."
         cd "${DATA_DIR:-/opt/marzban}" 2>/dev/null && docker compose down 2>/dev/null || true
     fi
     
-    # Execute custom rollback commands in reverse order
-    local i
-    for (( i=${#ROLLBACK_STACK[@]}-1; i>=0; i-- )); do
-        if [[ -n "${ROLLBACK_STACK[$i]:-}" ]]; then
-            local description="${ROLLBACK_STACK[$i]%%|||*}"
-            local command="${ROLLBACK_STACK[$i]##*|||}"
-            log_info "Rolling back: ${description}"
-            eval "$command" 2>/dev/null || log_warn "Rollback command failed: ${command}"
-        fi
-    done
+    # 1. Critical Rollbacks (e.g. Restore Firewall/SSH access)
+    if [[ ${#CRITICAL_ROLLBACK[@]} -gt 0 ]]; then
+        log_info "Executing CRITICAL rollback actions..."
+        process_rollback_stack CRITICAL_ROLLBACK "CRITICAL"
+    fi
     
-    # Remove created files
+    # 2. Normal Rollbacks
+    if [[ ${#NORMAL_ROLLBACK[@]} -gt 0 ]]; then
+        log_info "Executing normal rollback actions..."
+        process_rollback_stack NORMAL_ROLLBACK "NORMAL"
+    fi
+
+    # 3. Cleanup Rollbacks (Removing files)
+    if [[ ${#CLEANUP_ROLLBACK[@]} -gt 0 ]]; then
+        log_info "Executing cleanup actions..."
+        process_rollback_stack CLEANUP_ROLLBACK "CLEANUP"
+    fi
+    
+    # Remove created files (Global list)
     for filepath in "${CREATED_FILES[@]:-}"; do
         if [[ -n "$filepath" && -e "$filepath" ]]; then
             log_info "Removing: ${filepath}"
@@ -125,9 +167,7 @@ execute_rollback() {
     echo -e "${YELLOW}       ROLLBACK COMPLETED              ${NC}"
     echo -e "${YELLOW}========================================${NC}"
     log_warn "System has been restored to previous state."
-    log_warn "Please check the logs above for details."
 }
-
 # Trap handler for errors
 error_handler() {
     local exit_code=$?
