@@ -51,7 +51,7 @@ MARZBAN_ADMIN_USER="admin"
 MARZBAN_ADMIN_PASS=""
 MARZBAN_PORT="8443"
 ADGUARD_WEB_PORT="3000"
-ADGUARD_DNS_PORT="5353"
+ADGUARD_DNS_PORT="53"
 ADGUARD_USER="admin"
 ADGUARD_PASS=""
 PROFILE1_PORT="443"
@@ -223,7 +223,7 @@ main_installation() {
         "$PANEL_DOMAIN" \
         "$SUB_DOMAIN" \
         "$MARZBAN_PORT" \
-        "${ADGUARD_DNS:-adguardhome:5353}" \
+        "${ADGUARD_DNS:-adguardhome:53}" \
         "${DATA_DIR}/ssl/${PANEL_DOMAIN}.crt" \
         "${DATA_DIR}/ssl/${PANEL_DOMAIN}.key" \
         "$PROFILE1_PORT" "$PROFILE2_PORT" "$PROFILE3_PORT"
