@@ -211,7 +211,7 @@ command_exists() {
 # Generate random password (alphanumeric only to avoid shell evaluation issues)
 generate_password() {
     local length="${1:-32}"
-    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length"
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length" || true
 }
 
 # Generate alphanumeric string (for IDs)
