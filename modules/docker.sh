@@ -25,7 +25,7 @@ check_docker_compose_installed() {
     if docker compose version &>/dev/null; then
         local compose_version
         compose_version=$(docker compose version --short 2>/dev/null || echo "unknown")
-        if ! docker compose version 2>&1 | grep -q "Docker Compose version v2"; then
+        if ! docker compose version 2>&1 | grep -qE "Docker Compose version v[2-9]"; then
             log_warn "Old docker-compose v1 detected, need v2 plugin"
             return 1
         fi
