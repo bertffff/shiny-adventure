@@ -340,7 +340,7 @@ wait_for_marzban() {
         http_code=$(curl -sk -o /dev/null -w "%{http_code}" \
             "https://127.0.0.1:${panel_port}/api/admin/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            --data "username=test&password=test" 2>/dev/null)
+            --data "username=test&password=test" 2>/dev/null || echo "000")
         
         # 401/422 означают что API работает (просто неверные credentials)
         if [[ "$http_code" == "401" || "$http_code" == "422" || "$http_code" == "200" ]]; then
