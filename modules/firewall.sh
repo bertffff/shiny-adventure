@@ -145,12 +145,6 @@ enable_ufw() {
     ufw --force enable
     log_success "UFW enabled"
 }
-    
-    # Enable UFW
-    ufw --force enable
-    
-    log_success "UFW enabled"
-}
 
 # Print UFW status
 print_ufw_status() {
