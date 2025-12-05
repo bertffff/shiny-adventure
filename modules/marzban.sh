@@ -404,7 +404,7 @@ check_marzban_health() {
     
     # Check API endpoint
     local http_code
-    http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" "https://127.0.0.1:${panel_port}/api/" 2>/dev/null)
+    http_code=$(curl -sf -k -o /dev/null -w "%{http_code}" "https://127.0.0.1:${panel_port}/dashboard/" 2>/dev/null)
     
     if [[ "$http_code" == "200" || "$http_code" == "401" || "$http_code" == "422" ]]; then
         log_success "Marzban API is healthy (HTTP ${http_code})"
