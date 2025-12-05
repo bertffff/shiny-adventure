@@ -172,7 +172,7 @@ generate_full_xray_config() {
     local profile3_sni="$8"
     local warp_outbound_file="$9"
     
-    log_info "Generating full Xray configuration..."
+    log_info "Generating full Xray configuration..." >&2
     
     # Read WARP outbound if exists
     local warp_outbound=""
