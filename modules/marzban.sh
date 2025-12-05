@@ -338,7 +338,7 @@ wait_for_marzban() {
         # Проверяем HTTP код ответа
         local http_code
         http_code=$(curl -sk -o /dev/null -w "%{http_code}" \
-            "https://127.0.0.1:${panel_port}/dashboard/login" \
+            "https://127.0.0.1:${panel_port}/dashboard/" \
             2>/dev/null || echo "000")
         
         # 401/422 означают что API работает (просто неверные credentials)
