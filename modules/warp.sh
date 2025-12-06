@@ -133,12 +133,13 @@ parse_warp_config() {
     echo "WARP_MTU=${mtu}"
 }
 
-# Generate sing-box outbound configuration for WARP
-generate_singbox_warp_outbound() {
+# Generate Xray-compatible WireGuard outbound configuration for WARP
+# NOTE: This is for Xray, NOT sing-box!
+generate_xray_warp_outbound() {
     local config_file="${1:-$WARP_CONFIG_FILE}"
     local output_file="${2:-${WARP_DIR}/warp_outbound.json}"
     
-    log_info "Generating sing-box WARP outbound configuration..."
+    log_info "Generating Xray-compatible WARP outbound configuration..."
     
     # Parse WARP config
     local warp_vars
@@ -152,32 +153,59 @@ generate_singbox_warp_outbound() {
     # Export variables
     eval "$warp_vars"
     
-    # Generate sing-box WireGuard outbound JSON
+    # Validate required fields
+    if [[ -z "$WARP_PRIVATE_KEY" || -z "$WARP_PUBLIC_KEY" || -z "$WARP_ENDPOINT_HOST" ]]; then
+        log_error "Missing required WARP configuration fields"
+        return 1
+    fi
+    
+    # Extract IP without CIDR notation for Xray
+    local address_v4_ip="${WARP_ADDRESS_V4%/*}"
+    local address_v6_ip="${WARP_ADDRESS_V6%/*}"
+    
+    # Generate Xray WireGuard outbound JSON
+    # Xray WireGuard format is different from sing-box!
     cat > "$output_file" << EOF
 {
-  "type": "wireguard",
   "tag": "warp-out",
-  "server": "${WARP_ENDPOINT_HOST}",
-  "server_port": ${WARP_ENDPOINT_PORT},
-  "local_address": [
-    "${WARP_ADDRESS_V4}",
-    "${WARP_ADDRESS_V6}"
-  ],
-  "private_key": "${WARP_PRIVATE_KEY}",
-  "peer_public_key": "${WARP_PUBLIC_KEY}",
-  "reserved": [0, 0, 0],
-  "mtu": ${WARP_MTU}
+  "protocol": "wireguard",
+  "settings": {
+    "secretKey": "${WARP_PRIVATE_KEY}",
+    "address": ["${address_v4_ip}/32", "${address_v6_ip}/128"],
+    "peers": [
+      {
+        "publicKey": "${WARP_PUBLIC_KEY}",
+        "allowedIPs": ["0.0.0.0/0", "::/0"],
+        "endpoint": "${WARP_ENDPOINT_HOST}:${WARP_ENDPOINT_PORT}"
+      }
+    ],
+    "mtu": ${WARP_MTU},
+    "reserved": [0, 0, 0]
+  }
 }
 EOF
+    
+    # Validate generated JSON
+    if ! jq -e '.' "$output_file" &>/dev/null; then
+        log_error "Generated WARP outbound JSON is invalid"
+        rm -f "$output_file"
+        return 1
+    fi
     
     chmod 0600 "$output_file"
     register_file "$output_file"
     
-    log_success "sing-box WARP outbound config saved to ${output_file}"
+    log_success "Xray WARP outbound config saved to ${output_file}"
     
     # Print the config for verification
     log_debug "WARP outbound configuration:"
     cat "$output_file" | jq '.' 2>/dev/null || cat "$output_file"
+}
+
+# Legacy function name for compatibility
+generate_singbox_warp_outbound() {
+    log_warn "generate_singbox_warp_outbound is deprecated, using generate_xray_warp_outbound"
+    generate_xray_warp_outbound "$@"
 }
 
 # Test WARP connectivity
@@ -230,6 +258,7 @@ IPv6 Address: ${WARP_ADDRESS_V6}
 MTU: ${WARP_MTU}
 
 # NOTE: Private key stored in ${WARP_CONFIG_FILE}
+# Xray outbound config stored in ${WARP_DIR}/warp_outbound.json
 EOF
     
     chmod 0644 "$summary_file"
@@ -247,7 +276,7 @@ setup_warp() {
         log_info "Existing WARP configuration found"
         
         if confirm_action "Use existing WARP config?" "y"; then
-            generate_singbox_warp_outbound
+            generate_xray_warp_outbound
             save_warp_summary
             return 0
         fi
@@ -267,8 +296,8 @@ setup_warp() {
     # Generate config
     generate_warp_config "$WARP_DIR"
     
-    # Generate sing-box outbound
-    generate_singbox_warp_outbound
+    # Generate Xray-compatible outbound (NOT sing-box!)
+    generate_xray_warp_outbound
     
     # Save summary
     save_warp_summary
@@ -300,28 +329,49 @@ setup_warp_via_api() {
     local private_key
     local public_key
     
-    private_key=$(wg genkey 2>/dev/null || openssl rand -base64 32)
-    public_key=$(echo "$private_key" | wg pubkey 2>/dev/null)
+    # Check if wg command is available
+    if command_exists wg; then
+        private_key=$(wg genkey)
+        public_key=$(echo "$private_key" | wg pubkey)
+    else
+        log_error "WireGuard tools not installed. Installing..."
+        apt-get update -qq && apt-get install -y -qq wireguard-tools
+        private_key=$(wg genkey)
+        public_key=$(echo "$private_key" | wg pubkey)
+    fi
     
     if [[ -z "$public_key" ]]; then
         log_error "Failed to generate WireGuard keys"
         return 1
     fi
     
-# Call Cloudflare API to register device
+    # Call Cloudflare API to register device
     local response
     response=$(curl -sX POST "https://api.cloudflareclient.com/v0a2158/reg" \
         -H "Content-Type: application/json" \
         -H "CF-Client-Version: a-6.11-2223" \
-        --data "{\"key\":\"${public_key}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"$(cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 16)\"}")    
-    if [[ -z "$response" ]] || echo "$response" | jq -e '.result.config' &>/dev/null; then
+        --data "{\"key\":\"${public_key}\",\"install_id\":\"\",\"fcm_token\":\"\",\"tos\":\"$(date +%Y-%m-%dT%H:%M:%S.000Z)\",\"model\":\"Linux\",\"serial_number\":\"$(cat /proc/sys/kernel/random/uuid | tr -d '-' | head -c 16)\"}")
+    
+    if [[ -z "$response" ]]; then
+        log_error "WARP API registration failed - empty response"
+        return 1
+    fi
+    
+    # Check for error in response
+    if echo "$response" | jq -e '.success == false' &>/dev/null; then
         log_error "WARP API registration failed"
+        log_error "Response: $response"
         return 1
     fi
     
     # Parse response and create config
     local config
-    config=$(echo "$response" | jq -r '.result.config')
+    config=$(echo "$response" | jq -r '.result.config // empty')
+    
+    if [[ -z "$config" ]]; then
+        log_error "Failed to extract config from WARP API response"
+        return 1
+    fi
     
     # Extract peer config
     local peer_public_key
@@ -330,11 +380,16 @@ setup_warp_via_api() {
     local address_v4
     local address_v6
     
-    peer_public_key=$(echo "$config" | jq -r '.peers[0].public_key')
-    endpoint_host=$(echo "$config" | jq -r '.peers[0].endpoint.host')
+    peer_public_key=$(echo "$config" | jq -r '.peers[0].public_key // empty')
+    endpoint_host=$(echo "$config" | jq -r '.peers[0].endpoint.host // "engage.cloudflareclient.com"')
     endpoint_port=$(echo "$config" | jq -r '.peers[0].endpoint.port // 2408')
-    address_v4=$(echo "$config" | jq -r '.interface.addresses.v4')
-    address_v6=$(echo "$config" | jq -r '.interface.addresses.v6')
+    address_v4=$(echo "$config" | jq -r '.interface.addresses.v4 // empty')
+    address_v6=$(echo "$config" | jq -r '.interface.addresses.v6 // empty')
+    
+    if [[ -z "$peer_public_key" || -z "$address_v4" ]]; then
+        log_error "Missing required fields in WARP API response"
+        return 1
+    fi
     
     # Create WireGuard config file
     cat > "$WARP_CONFIG_FILE" << EOF
@@ -355,7 +410,7 @@ EOF
     
     log_success "WARP registered via API"
     
-    # Generate sing-box outbound
-    generate_singbox_warp_outbound
+    # Generate Xray-compatible outbound
+    generate_xray_warp_outbound
     save_warp_summary
 }
