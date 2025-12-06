@@ -160,6 +160,60 @@ generate_vless_reality_inbound() {
 EOF
 }
 
+# Validate and read WARP outbound configuration
+# Returns valid JSON or empty string
+read_warp_outbound() {
+    local warp_outbound_file="$1"
+    
+    # Check if file exists and is not empty
+    if [[ ! -f "$warp_outbound_file" ]]; then
+        log_warn "WARP outbound file not found: ${warp_outbound_file}" >&2
+        echo ""
+        return 1
+    fi
+    
+    if [[ ! -s "$warp_outbound_file" ]]; then
+        log_warn "WARP outbound file is empty: ${warp_outbound_file}" >&2
+        echo ""
+        return 1
+    fi
+    
+    # Read and validate JSON
+    local warp_content
+    warp_content=$(cat "$warp_outbound_file")
+    
+    # Validate JSON structure
+    if ! echo "$warp_content" | jq -e '.' &>/dev/null; then
+        log_warn "WARP outbound file contains invalid JSON" >&2
+        echo ""
+        return 1
+    fi
+    
+    # Validate required fields for WireGuard outbound
+    local outbound_type
+    outbound_type=$(echo "$warp_content" | jq -r '.type // empty')
+    
+    if [[ -z "$outbound_type" ]]; then
+        log_warn "WARP outbound missing 'type' field" >&2
+        echo ""
+        return 1
+    fi
+    
+    # Check for required WireGuard fields
+    local private_key
+    private_key=$(echo "$warp_content" | jq -r '.private_key // empty')
+    
+    if [[ -z "$private_key" ]]; then
+        log_warn "WARP outbound missing 'private_key' field" >&2
+        echo ""
+        return 1
+    fi
+    
+    log_info "WARP outbound configuration validated successfully" >&2
+    echo "$warp_content"
+    return 0
+}
+
 # Generate full xray configuration with all profiles
 generate_full_xray_config() {
     local private_key="$1"
@@ -174,16 +228,64 @@ generate_full_xray_config() {
     
     log_info "Generating full Xray configuration..." >&2
     
-    # Read WARP outbound if exists
+    # Read and validate WARP outbound
     local warp_outbound=""
-    if [[ -f "$warp_outbound_file" ]]; then
-        warp_outbound=$(cat "$warp_outbound_file")
+    local warp_routing_rule=""
+    
+    if [[ -n "$warp_outbound_file" ]]; then
+        warp_outbound=$(read_warp_outbound "$warp_outbound_file")
+    fi
+    
+    # Build outbounds section
+    local outbounds_json=""
+    if [[ -n "$warp_outbound" ]]; then
+        log_info "Including WARP outbound in configuration" >&2
+        outbounds_json=$(cat << EOF
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    },
+    ${warp_outbound}
+EOF
+)
+        # Add WARP routing rule
+        warp_routing_rule=$(cat << 'EOF'
+      {
+        "type": "field",
+        "inboundTag": ["VLESS_REALITY_WARP"],
+        "outboundTag": "warp-out"
+      },
+EOF
+)
+    else
+        log_warn "WARP outbound not available, Profile 3 will use direct routing" >&2
+        outbounds_json=$(cat << EOF
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+EOF
+)
+        warp_routing_rule=""
     fi
     
     # Convert short_ids to JSON array
     local short_ids_json
     short_ids_json=$(echo "$short_ids" | tr ',' '\n' | jq -R . | jq -s .)
     
+    # Generate the full configuration
     cat << EOF
 {
   "log": {
@@ -306,16 +408,7 @@ generate_full_xray_config() {
     }
   ],
   "outbounds": [
-    {
-      "tag": "direct",
-      "protocol": "freedom",
-      "settings": {}
-    },
-    {
-      "tag": "blocked",
-      "protocol": "blackhole",
-      "settings": {}
-    }$(if [[ -n "$warp_outbound" ]]; then echo ","; echo "$warp_outbound"; fi)
+${outbounds_json}
   ],
   "routing": {
     "domainStrategy": "AsIs",
@@ -325,11 +418,7 @@ generate_full_xray_config() {
         "inboundTag": ["api-inbound"],
         "outboundTag": "api"
       },
-      {
-        "type": "field",
-        "inboundTag": ["VLESS_REALITY_WARP"],
-        "outboundTag": "warp-out"
-      },
+${warp_routing_rule}
       {
         "type": "field",
         "outboundTag": "direct",
@@ -348,9 +437,19 @@ apply_xray_config() {
     
     log_info "Applying Xray configuration..."
     
-    # Validate JSON
+    # Validate JSON before applying
     if ! echo "$config_json" | jq '.' &>/dev/null; then
         log_error "Invalid JSON configuration"
+        log_error "JSON validation error:"
+        echo "$config_json" | jq '.' 2>&1 | head -20
+        return 1
+    fi
+    
+    # Additional validation: check for empty outbound types
+    local empty_types
+    empty_types=$(echo "$config_json" | jq -r '.outbounds[]? | select(.type == "" or .type == null) | .tag // "unknown"' 2>/dev/null)
+    if [[ -n "$empty_types" ]]; then
+        log_error "Found outbounds with empty type: ${empty_types}"
         return 1
     fi
     
@@ -359,14 +458,16 @@ apply_xray_config() {
         cp "$config_file" "${config_file}.backup.$(date +%Y%m%d_%H%M%S)"
     fi
     
-    # Write new config
+    # Write new config with proper formatting
     echo "$config_json" | jq '.' > "$config_file"
     chmod 0644 "$config_file"
     
     # Also save to Marzban directory
-    echo "$config_json" | jq '.' > "${MARZBAN_DIR:-/opt/marzban}/xray_config.json"
+    local marzban_config="${MARZBAN_DIR:-/opt/marzban}/xray_config.json"
+    echo "$config_json" | jq '.' > "$marzban_config"
+    chmod 0644 "$marzban_config"
     
-    log_success "Xray configuration applied"
+    log_success "Xray configuration applied to ${config_file}"
 }
 
 # Create inbounds host mapping for Marzban
@@ -498,6 +599,15 @@ configure_profiles_via_api() {
         "$profile3_sni" \
         "$warp_outbound_file")
     
+    # Validate generated config before applying
+    log_info "Validating generated Xray configuration..."
+    if ! echo "$xray_config" | jq -e '.' &>/dev/null; then
+        log_error "Generated Xray configuration is invalid JSON"
+        log_error "Config preview:"
+        echo "$xray_config" | head -50
+        return 1
+    fi
+    
     # Apply xray configuration
     if ! apply_xray_config "$xray_config"; then
         log_error "Failed to apply Xray configuration"
@@ -558,7 +668,11 @@ configure_profiles_via_api() {
     echo "  - Port: ${profile3_port}"
     echo "  - SNI: ${profile3_sni}"
     echo "  - Protocol: VLESS + Reality + Vision"
-    echo "  - Routing: Via WARP"
+    if [[ -n "$warp_outbound_file" ]] && [[ -f "$warp_outbound_file" ]]; then
+        echo "  - Routing: Via WARP"
+    else
+        echo "  - Routing: Direct (WARP not configured)"
+    fi
     echo ""
     echo "Reality Public Key: ${public_key}"
     echo "Short ID: ${first_short_id}"
