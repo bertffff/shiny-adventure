@@ -191,7 +191,7 @@ read_warp_outbound() {
     
     # Validate required fields for WireGuard outbound
     local outbound_type
-    outbound_type=$(echo "$warp_content" | jq -r '.type // empty')
+    outbound_type=$(echo "$warp_content" | jq -r '.protocol // empty')
     
     if [[ -z "$outbound_type" ]]; then
         log_warn "WARP outbound missing 'type' field" >&2
@@ -447,7 +447,7 @@ apply_xray_config() {
     
     # Additional validation: check for empty outbound types
     local empty_types
-    empty_types=$(echo "$config_json" | jq -r '.outbounds[]? | select(.type == "" or .type == null) | .tag // "unknown"' 2>/dev/null)
+    empty_types=$(echo "$config_json" | jq -r '.outbounds[]? | select(.protocol == "" or .protocol == null) | .tag // "unknown"' 2>/dev/null)
     if [[ -n "$empty_types" ]]; then
         log_error "Found outbounds with empty type: ${empty_types}"
         return 1
