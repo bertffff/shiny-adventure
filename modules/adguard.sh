@@ -23,6 +23,11 @@ generate_bcrypt_hash() {
     fi
     
     # Use Python as fallback
+    if [[ -x /opt/bcrypt-venv/bin/python3 ]]; then
+        /opt/bcrypt-venv/bin/python3 -c "import bcrypt; print(bcrypt.hashpw(b'${password}', bcrypt.gensalt(10)).decode())" 2>/dev/null && return
+    fi
+
+# Затем системный python
     if command_exists python3; then
         python3 -c "import bcrypt; print(bcrypt.hashpw(b'${password}', bcrypt.gensalt(10)).decode())" 2>/dev/null && return
     fi
