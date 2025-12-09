@@ -56,6 +56,33 @@ log_step() {
 }
 
 # -----------------------------------------------------------------------------
+# SYSTEM OPTIMIZATION (BBR)
+# -----------------------------------------------------------------------------
+enable_bbr() {
+    log_step "Optimizing Kernel (TCP BBR)"
+    
+    local sysctl_conf="/etc/sysctl.conf"
+    local changed=false
+
+    if ! grep -q "net.core.default_qdisc=fq" "$sysctl_conf"; then
+        echo "net.core.default_qdisc=fq" >> "$sysctl_conf"
+        changed=true
+    fi
+
+    if ! grep -q "net.ipv4.tcp_congestion_control=bbr" "$sysctl_conf"; then
+        echo "net.ipv4.tcp_congestion_control=bbr" >> "$sysctl_conf"
+        changed=true
+    fi
+
+    if [[ "$changed" == "true" ]]; then
+        sysctl -p
+        log_success "TCP BBR enabled"
+    else
+        log_info "TCP BBR is already enabled"
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # ROLLBACK SYSTEM (Try/Catch Pattern)
 # -----------------------------------------------------------------------------
 
