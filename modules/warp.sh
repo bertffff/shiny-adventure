@@ -109,7 +109,7 @@ parse_warp_config() {
     
     private_key=$(grep -E "^PrivateKey\s*=" "$config_file" | cut -d= -f2 | tr -d ' ')
     address_v4=$(grep -E "^Address\s*=" "$config_file" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+' | head -1)
-    address_v6=$(grep -E "^Address\s*=" "$config_file" | grep -oE '[0-9a-f:]+/[0-9]+' | head -1)
+    address_v6=$(grep -E "^Address\s*=" "$config_file" | grep -oE '[0-9a-f:]+:[0-9a-f:]+/[0-9]+' | head -1)
     public_key=$(grep -E "^PublicKey\s*=" "$config_file" | cut -d= -f2 | tr -d ' ')
     endpoint=$(grep -E "^Endpoint\s*=" "$config_file" | cut -d= -f2 | tr -d ' ')
     mtu=$(grep -E "^MTU\s*=" "$config_file" | cut -d= -f2 | tr -d ' ')
