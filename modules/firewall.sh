@@ -131,27 +131,15 @@ allow_http_https() {
 enable_ufw() {
     log_info "Enabling UFW..."
     
-    # Double-check SSH is allowed before enabling
     local ssh_port
     ssh_port=$(detect_ssh_port)
     
-enable_ufw() {
-    log_info "Enabling UFW..."
-    
-    local ssh_port
-    ssh_port=$(detect_ssh_port)
-    
-    # Проверяем UFW rules в файле, а не через status (который работает только когда UFW enabled)
-    if ! grep -qE "^ufw allow ${ssh_port}/tcp" /etc/ufw/user.rules 2>/dev/null && \
-       ! ufw show added | grep -qE "${ssh_port}/tcp.*ALLOW"; then
-        log_error "SSH port ${ssh_port} not in UFW rules! Aborting to prevent lockout."
-        log_error "Run: ufw allow ${ssh_port}/tcp"
-        return 1
+    # Проверка, что правило для SSH добавлено
+    if ! ufw status | grep -qE "^${ssh_port}(/tcp)?\s+ALLOW"; then
+        # На всякий случай пробуем добавить еще раз, если правила нет
+        log_warn "SSH rule verification failed, re-adding port ${ssh_port}"
+        ufw allow "${ssh_port}/tcp" comment "SSH Safe"
     fi
-    
-    ufw --force enable
-    log_success "UFW enabled"
-}
     
     # Enable UFW
     ufw --force enable
