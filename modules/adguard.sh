@@ -39,19 +39,13 @@ install_bcrypt_deps() {
     log_info "Installing bcrypt dependencies..."
     
     apt-get update -qq
-    apt-get install -y -qq apache2-utils
+    apt-get install -y -qq apache2-utils python3-venv python3-pip
     
-    # Используем pipx для изолированной установки
-    if ! command_exists pipx; then
-        apt-get install -y -qq pipx
-        pipx ensurepath
-    fi
-    
-    # Или используем venv
+    # Используем venv для изолированной установки bcrypt
     if ! python3 -c "import bcrypt" 2>/dev/null; then
+        log_info "Installing bcrypt via venv..."
         python3 -m venv /opt/bcrypt-venv
-        /opt/bcrypt-venv/bin/pip install bcrypt
-        ln -sf /opt/bcrypt-venv/bin/python3 /usr/local/bin/bcrypt-python
+        /opt/bcrypt-venv/bin/pip install --quiet bcrypt
     fi
 }
 
