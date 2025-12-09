@@ -407,7 +407,7 @@ check_marzban_health() {
     log_info "Checking Marzban health..."
     
     # Check container status
-    if ! docker ps | grep -q marzban; then
+    if [[ "$(docker container inspect -f '{{.State.Running}}' marzban 2>/dev/null)" != "true" ]]; then
         log_error "Marzban container is not running"
         return 1
     fi
