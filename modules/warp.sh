@@ -122,6 +122,10 @@ parse_warp_config() {
     local endpoint_port
     endpoint_host=$(echo "$endpoint" | cut -d: -f1)
     endpoint_port=$(echo "$endpoint" | cut -d: -f2)
+
+    if [[ "$endpoint_host" == *"cloudflareclient.com"* ]]; then
+        endpoint_host="162.159.192.1"
+    fi
     
     # Output as environment variables
     echo "WARP_PRIVATE_KEY=${private_key}"
