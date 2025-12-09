@@ -286,27 +286,32 @@ setup_marzban_ssl() {
     
     log_info "Setting up SSL certificates for Marzban..."
     
+    # Создаём обе директории
     local marzban_ssl_dir="${MARZBAN_DIR}/ssl"
+    local varlib_ssl_dir="/var/lib/marzban/ssl"
+    
     create_dir "$marzban_ssl_dir" "0700"
+    mkdir -p "$varlib_ssl_dir"
+    chmod 0700 "$varlib_ssl_dir"
     
     if [[ ! -f "$cert_file" || ! -f "$key_file" ]]; then
         log_error "SSL certificate files not found"
         return 1
     fi
     
-    local target_cert="${marzban_ssl_dir}/${domain}.crt"
-    local target_key="${marzban_ssl_dir}/${domain}.key"
-    
-    # Копируем только если источник и назначение различаются
-    if [[ "$(realpath "$cert_file")" != "$(realpath "$target_cert" 2>/dev/null || echo "")" ]]; then
+    # Копируем в обе локации
+    for ssl_dir in "$marzban_ssl_dir" "$varlib_ssl_dir"; do
+        local target_cert="${ssl_dir}/${domain}.crt"
+        local target_key="${ssl_dir}/${domain}.key"
+        
         cp "$cert_file" "$target_cert"
         chmod 0644 "$target_cert"
-    fi
-    
-    if [[ "$(realpath "$key_file")" != "$(realpath "$target_key" 2>/dev/null || echo "")" ]]; then
+        
         cp "$key_file" "$target_key"
         chmod 0600 "$target_key"
-    fi
+        
+        log_info "SSL certificates copied to ${ssl_dir}"
+    done
     
     log_success "SSL certificates configured for Marzban"
 }
