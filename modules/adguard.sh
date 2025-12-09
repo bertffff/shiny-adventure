@@ -478,5 +478,3 @@ restart_adguard() {
     
     log_success "AdGuard Home restarted"
 }
-
-}
