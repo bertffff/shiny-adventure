@@ -12,7 +12,7 @@
 # - UFW Firewall
 # - SSL Certificates (Let's Encrypt)
 # - Three VPN profiles:
-#   1. Whitelist Bypass (port 443, SNI: vk.com)
+#   1. Whitelist Bypass (port 443)
 #   2. Standard Fast (direct routing)
 #   3. Via WARP (geo-unblock)
 #
@@ -191,6 +191,9 @@ main_installation() {
         exit 0
     fi
     
+    # Step 0: Optimize Kernel (BBR)
+    enable_bbr
+
     # Step 1: Install Docker
     install_docker
     
