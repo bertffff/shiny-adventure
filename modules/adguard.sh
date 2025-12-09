@@ -27,7 +27,7 @@ generate_bcrypt_hash() {
         /opt/bcrypt-venv/bin/python3 -c "import bcrypt; print(bcrypt.hashpw(b'${password}', bcrypt.gensalt(10)).decode())" 2>/dev/null && return
     fi
 
-# Затем системный python
+    # Затем системный python
     if command_exists python3; then
         python3 -c "import bcrypt; print(bcrypt.hashpw(b'${password}', bcrypt.gensalt(10)).decode())" 2>/dev/null && return
     fi
@@ -52,6 +52,41 @@ install_bcrypt_deps() {
         python3 -m venv /opt/bcrypt-venv
         /opt/bcrypt-venv/bin/pip install --quiet bcrypt
     fi
+}
+
+# Safe systemd-resolved configuration (don't kill it, just release port 53)
+configure_systemd_resolved() {
+    log_info "Configuring systemd-resolved to release port 53..."
+    
+    local config_dir="/etc/systemd/resolved.conf.d"
+    local config_file="${config_dir}/adguard.conf"
+    
+    # Проверка, занят ли 53 порт именно systemd-resolved
+    if ! ss -lptn 'sport = :53' | grep -q 'systemd-res'; then
+        log_info "Port 53 seems free or used by another service. Skipping systemd-resolved tweak."
+        return 0
+    fi
+
+    # Создаем override конфиг
+    mkdir -p "$config_dir"
+    cat > "$config_file" <<EOF
+[Resolve]
+DNS=1.1.1.1
+DNSStubListener=no
+EOF
+    
+    # Бэкап символической ссылки resolv.conf, если она есть
+    if [[ -L /etc/resolv.conf ]]; then
+        # Меняем ссылку на стандартный файл systemd (uplink), минуя stub-listener
+        ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    fi
+    
+    # Перезагружаем сервис
+    systemctl restart systemd-resolved
+    
+    register_rollback "Restore systemd-resolved" "rm -f '${config_file}' && ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf && systemctl restart systemd-resolved"
+    
+    log_success "systemd-resolved configured: StubListener disabled"
 }
 
 # Create AdGuard Home configuration
@@ -334,14 +369,8 @@ setup_adguard() {
     
     log_step "Setting up AdGuard Home"
 
-# [FIX] Check and free port 53
-    if ss -lptn 'sport = :53' | grep -q 'systemd-res'; then
-        log_warn "systemd-resolved is binding port 53. Disabling it to free port for AdGuard..."
-        systemctl disable --now systemd-resolved
-        rm -f /etc/resolv.conf
-        echo "nameserver 8.8.8.8" > /etc/resolv.conf
-        log_success "systemd-resolved disabled, port 53 should be free now."
-    fi
+    # Configure systemd-resolved safely instead of disabling it
+    configure_systemd_resolved
     
     # Generate password if not provided
     if [[ -z "$password" ]]; then
@@ -448,4 +477,6 @@ restart_adguard() {
     docker compose restart
     
     log_success "AdGuard Home restarted"
+}
+
 }
