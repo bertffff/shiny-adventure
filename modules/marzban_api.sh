@@ -200,11 +200,11 @@ read_warp_outbound() {
     fi
     
     # Check for required WireGuard fields
-    local private_key
-    private_key=$(echo "$warp_content" | jq -r '.private_key // empty')
-    
-    if [[ -z "$private_key" ]]; then
-        log_warn "WARP outbound missing 'private_key' field" >&2
+local private_key
+private_key=$(echo "$warp_content" | jq -r '.settings.secretKey // empty')
+
+if [[ -z "$private_key" ]]; then
+    log_warn "WARP outbound missing 'settings.secretKey' field" >&2
         echo ""
         return 1
     fi
