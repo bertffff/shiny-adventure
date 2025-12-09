@@ -303,13 +303,18 @@ setup_marzban_ssl() {
     for ssl_dir in "$marzban_ssl_dir" "$varlib_ssl_dir"; do
         local target_cert="${ssl_dir}/${domain}.crt"
         local target_key="${ssl_dir}/${domain}.key"
-        
-        cp "$cert_file" "$target_cert"
+    
+        # Проверяем, отличаются ли пути перед копированием
+        if [[ "$cert_file" != "$target_cert" ]]; then
+            cp "$cert_file" "$target_cert"
+        fi
         chmod 0644 "$target_cert"
-        
-        cp "$key_file" "$target_key"
+    
+        if [[ "$key_file" != "$target_key" ]]; then
+            cp "$key_file" "$target_key"
+        fi
         chmod 0600 "$target_key"
-        
+    
         log_info "SSL certificates copied to ${ssl_dir}"
     done
     
