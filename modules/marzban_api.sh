@@ -99,20 +99,40 @@ get_inbounds() {
 # Update system inbound configuration via hosts
 update_hosts_config() {
     local config_json="$1"
+    local max_retries=3
+    local retry=0
     
     log_info "Updating hosts configuration..."
     
-    local response
-    response=$(marzban_api_request "PUT" "/api/hosts" "$config_json")
+    while [[ $retry -lt $max_retries ]]; do
+        local response
+        local http_code
+        
+        # Получаем и код ответа, и тело
+        response=$(curl -sf -k -w "\n%{http_code}" \
+            -X PUT \
+            -H "Authorization: Bearer ${MARZBAN_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$config_json" \
+            "${MARZBAN_API_URL}/api/hosts" 2>/dev/null)
+        
+        http_code=$(echo "$response" | tail -1)
+        response=$(echo "$response" | sed '$d')
+        
+        if [[ "$http_code" == "200" ]]; then
+            log_success "Hosts configuration updated"
+            return 0
+        fi
+        
+        retry=$((retry + 1))
+        log_warn "Attempt ${retry}/${max_retries} failed (HTTP ${http_code}). Retrying in 5s..."
+        sleep 5
+    done
     
-    if [[ -n "$response" ]]; then
-        log_success "Hosts configuration updated"
-        return 0
-    fi
-    
-    log_error "Failed to update hosts configuration"
+    log_error "Failed to update hosts configuration after ${max_retries} attempts"
     return 1
 }
+
 
 # Create VLESS Reality inbound configuration JSON for Marzban
 # This creates the inbound settings that will be added to xray config
